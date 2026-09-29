@@ -27,6 +27,16 @@ async function askGeminiWithRetry(contents, maxRetries = 4) {
       console.error(`Gemini attempt ${attempt} failed:`);
       console.error(errorText);
 
+      // 429 Quota Exceeded വന്നാൽ ഉടൻ നിർത്തുക, വീണ്ടും ട്രൈ ചെയ്യരുത്
+      if (
+        errorText.includes("429") ||
+        errorText.includes("RESOURCE_EXHAUSTED") ||
+        errorText.includes("Quota exceeded")
+      ) {
+        throw new Error("QUOTA_EXCEEDED");
+      }
+
+      // 503 അല്ലെങ്കിൽ താൽക്കാലിക പ്രശ്നങ്ങൾക്ക് മാത്രം വെയിറ്റ് ചെയ്ത് ട്രൈ ചെയ്യുക
       if (
         errorText.includes("503") ||
         errorText.includes("UNAVAILABLE") ||
@@ -69,6 +79,9 @@ app.post('/analyze', upload.single('image'), async (req, res) => {
 
   } catch (error) {
     console.error(error);
+    if (error.message === "QUOTA_EXCEEDED") {
+      return res.status(429).json({ error: "Gemini API Quota Exceeded. Please try later." });
+    }
     res.status(500).json({ error: error.message });
   }
 });
